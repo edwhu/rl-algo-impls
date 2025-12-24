@@ -1,6 +1,121 @@
 # Edward's modifications
 Implemented Coinrun dataset generation logic. See launch_generate_coinrun_data_multi.py
+```
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+python launch_generate_coinrun_data_multi.py --num-workers 64 --cuda-visible-devices 7  --  --wandb-run-path sgoodfriend/rl-algo-impls-benchmarks/vmjd3amn   --output-dir /ephemeral/datasets/coinrun_hard_agent_episodes --n-envs=32
+```
 
+I also added Hugging Face dataset support so you can pull from HF instead. Do this:
+
+### Pull/download datasets from Hugging Face
+
+These datasets are stored as `.array_record` shards (plus `metadata_worker_*.json`). The easiest workflow is:
+- download the repo to a local folder
+- point your training/loader code at that folder (it will contain `train/`, `val/`, `test/`)
+
+#### `huggingface-cli download`
+Download CoinRun **hard agent** episodes:
+
+```
+mkdir -p /ephemeral/datasets
+huggingface-cli download edwhu/coinrun_hard_agent \
+  --repo-type dataset \
+  --local-dir /ephemeral/datasets/coinrun_hard_agent_episodes_hf \
+  --local-dir-use-symlinks False
+```
+
+Download CoinRun **agent** episodes:
+
+```
+mkdir -p /ephemeral/datasets
+huggingface-cli download edwhu/coinrun_agent_episodes \
+  --repo-type dataset \
+  --local-dir /ephemeral/datasets/coinrun_agent_episodes_hf \
+  --local-dir-use-symlinks False
+```
+
+#### Quick sanity-check after download
+
+```
+ls /ephemeral/datasets/coinrun_hard_agent_episodes_hf/{train,val,test} | head
+ls /ephemeral/datasets/coinrun_agent_episodes_hf/{train,val,test} | head
+```
+
+Now, you are ready to use the coinrun dataloader in the dreamer4 repo.
+
+If you ever generate your own dataset and want to upload to HF, you can follow the steps below.
+## Repro: upload CoinRun episode datasets to Hugging Face
+
+This repo generates CoinRun episode datasets under `/ephemeral/datasets/...` as chunked
+`.array_record` files plus `metadata_worker_*.json`.
+
+We provide two helper scripts:
+- `upload_hf_dataset.py`: upload the dataset folder to a Hugging Face **dataset** repo
+- `update_coinrun_hf_dataset_card.py`: generate + upload a dataset card (`README.md`) from `metadata_worker_*.json`
+
+### 0) Authenticate to Hugging Face
+
+Use any one of the following (cached auth is fine):
+
+```
+huggingface-cli login
+```
+
+### 1) Upload the dataset files (train/val/test shards + metadata)
+
+#### Important: correct glob patterns
+Our `.array_record` files live directly under `train/`, `val/`, `test/` (no extra nesting), so use:
+- `train/*.array_record` (NOT `train/**/*.array_record`)
+
+#### Recommended: large upload mode (resumable)
+Use `--large` (wraps `HfApi().upload_large_folder`) for robustness with many shards.
+
+CoinRun hard agent episodes:
+
+```
+python3 upload_hf_dataset.py \
+  --folder-path /ephemeral/datasets/coinrun_hard_agent_episodes \
+  --repo-id edwhu/coinrun_hard_agent \
+  --repo-type dataset \
+  --allow 'train/*.array_record' \
+  --allow 'val/*.array_record' \
+  --allow 'test/*.array_record' \
+  --allow 'metadata*.json' \
+  --large \
+  --num-workers 16
+```
+
+#### Optional: dry-run pattern check
+Before uploading, you can sanity-check which files match your patterns:
+
+```
+python3 upload_hf_dataset.py \
+  --folder-path /ephemeral/datasets/coinrun_agent_episodes \
+  --repo-id edwhu/coinrun_agent_episodes \
+  --repo-type dataset \
+  --allow 'train/*.array_record' \
+  --allow 'val/*.array_record' \
+  --allow 'test/*.array_record' \
+  --allow 'metadata*.json' \
+  --dry-run
+```
+
+### 2) Generate + upload the dataset card (README.md on the Hub)
+
+This reads local `metadata_worker_*.json`, summarizes split sizes/success rates/chunking, and
+uploads `README.md` to the HF dataset repo.
+
+Hard agent dataset card:
+
+```
+python3 update_coinrun_hf_dataset_card.py \
+  --dataset-dir /ephemeral/datasets/coinrun_hard_agent_episodes \
+  --repo-id edwhu/coinrun_hard_agent \
+  --upload \
+  --verify-remote
+```
 
 # rl-algo-impls
 
