@@ -225,7 +225,11 @@ def _make_procgen_env(
         make_kwargs["render_mode"] = "rgb_array"
     if seed is not None:
         make_kwargs["rand_seed"] = seed
-
+    # Use hard distribution to create data.
+    make_kwargs["rand_seed"] = None # force env to make its own seed.
+    make_kwargs["distribution_mode"] = "hard"
+    np.random.seed(None)
+    make_kwargs["start_level"] = np.random.randint(0, 1000000)
     envs = ProcgenEnv(n_envs, config.env_id, **make_kwargs)
     envs = IsVectorEnv(envs)
     envs = GetRgbObservation(envs)

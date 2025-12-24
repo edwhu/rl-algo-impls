@@ -1,3 +1,7 @@
+# Edward's modifications
+Implemented Coinrun dataset generation logic. See launch_generate_coinrun_data_multi.py
+
+
 # rl-algo-impls
 
 Implementations of reinforcement learning algorithms.
